@@ -5,42 +5,15 @@ pub fn build(b: *std.Build) void {
     Ensure_Minimal_Zig_Version() catch
         @panic("Zig 0.14.0 or higher is required for compilation!");
 
-    const name = "multiplayer-brawler";
-    const src_filepath = "src/";
-    const main_filepath = src_filepath ++ "main.zig";
-    const tests_filepath = src_filepath ++ "tests.zig";
-
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
-
-    const exe = b.addExecutable(.{
-        .name = name,
-        .root_module = b.createModule(.{
-            .root_source_file = b.path(main_filepath),
-            .target = target,
-            .optimize = optimize,
-        }),
-    });
-    exe.linkSystemLibrary("SDL3");
-    exe.linkLibC();
-    b.installArtifact(exe);
+    Make_Client_Executable(b, target, optimize);
+    Make_Server_Executable(b, target, optimize);
 
     // format source files
-    const format_options = std.Build.Step.Fmt.Options{ .paths = &.{src_filepath} };
+    const format_options = std.Build.Step.Fmt.Options{ .paths = &.{"src/"} };
     const performStep_format = b.addFmt(format_options);
     b.default_step.dependOn(&performStep_format.step);
-
-    // unit testing
-    const added_tests = b.addTest(.{ .root_source_file = b.path(tests_filepath) });
-    const performStep_test = b.addRunArtifact(added_tests);
-    b.default_step.dependOn(&performStep_test.step);
-
-    // run executable
-    var run_step = b.step("run", "Run the executable");
-    const performStep_run = b.addRunArtifact(exe);
-    if (b.args) |args|
-        performStep_run.addArgs(args);
-    run_step.dependOn(&performStep_run.step);
 }
 
 /// Assert Zig 0.14.0 or higher
@@ -58,4 +31,56 @@ pub fn Ensure_Minimal_Zig_Version() !void {
         .eq => {},
         .gt => {},
     }
+}
+
+// does not require SDL
+pub fn Make_Server_Executable(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const exe = b.addExecutable(.{
+        .name = "server",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/server/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    b.installArtifact(exe);
+
+    // unit testing
+    const added_tests = b.addTest(.{ .root_source_file = b.path("src/server/tests.zig") });
+    const performStep_test = b.addRunArtifact(added_tests);
+    b.default_step.dependOn(&performStep_test.step);
+
+    // run executable
+    var run_step = b.step("run_server", "Run the server executable");
+    const performStep_run = b.addRunArtifact(exe);
+    if (b.args) |args|
+        performStep_run.addArgs(args);
+    run_step.dependOn(&performStep_run.step);
+}
+
+// requires SDL3 linking
+pub fn Make_Client_Executable(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) void {
+    const exe = b.addExecutable(.{
+        .name = "client",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/client/main.zig"),
+            .target = target,
+            .optimize = optimize,
+        }),
+    });
+    exe.linkSystemLibrary("SDL3");
+    exe.linkLibC();
+    b.installArtifact(exe);
+
+    // unit testing
+    const added_tests = b.addTest(.{ .root_source_file = b.path("src/client/tests.zig") });
+    const performStep_test = b.addRunArtifact(added_tests);
+    b.default_step.dependOn(&performStep_test.step);
+
+    // run executable
+    var run_step = b.step("run_client", "Run the client executable");
+    const performStep_run = b.addRunArtifact(exe);
+    if (b.args) |args|
+        performStep_run.addArgs(args);
+    run_step.dependOn(&performStep_run.step);
 }
