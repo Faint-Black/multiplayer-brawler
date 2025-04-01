@@ -14,6 +14,7 @@ pub const NetHandler = struct {
     packet_len: usize = 0,
     connection_stream: ?std.net.Stream = null,
 
+    /// not responsible for establishing connection
     pub fn Init(allocator: std.mem.Allocator) NetHandler {
         var result = NetHandler{};
         result.allocator = allocator;
@@ -77,12 +78,8 @@ pub const NetHandler = struct {
     }
 
     /// crash and burn
-    pub fn Log_Error_And_Destroy(this: *NetHandler, msg: []const u8, error_msg: ?[]const u8) void {
-        if (error_msg) |error_message| {
-            std.log.err("NETWORK error: {s}: \"{s}\"\nkilling handler...", .{ msg, error_message });
-        } else {
-            std.log.err("NETWORK error: {s}\nkilling handler...", .{msg});
-        }
+    pub fn Log_Error_And_Destroy(this: *NetHandler, msg: []const u8) void {
+        std.log.err("fatal NETWORK error: {s}, killing handler...", .{msg});
         this.Deinit();
     }
 };

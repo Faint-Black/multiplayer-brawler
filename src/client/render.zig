@@ -14,18 +14,32 @@ const sdl = @cImport({
 });
 
 pub const Renderer = struct {
-    /// ticks per second
-    pub const tick_rate = 20;
-    /// interval between ticks, in milliseconds
-    pub const tick_interval = 1000 / tick_rate;
+    /// tick/frame tracking variables and constants
+    // should be good enough for this game
+    pub const ticks_per_second = 20;
+    // standard
+    pub const frames_per_second = 60;
+    // 50ms per tick
+    pub const tick_interval = 1000 / ticks_per_second;
+    // 16ms per frame
+    pub const frame_interval = 1000 / frames_per_second;
+    // cap amount of ticks processed in one frame
+    pub const max_frame_skip = 5;
+    // for handling multiple ticks in one go, if needed
+    loop_count: i32 = undefined,
+    // target time for when the next game tick should occur
+    next_game_tick: u64 = undefined,
+    // current elapsed time
+    current_time: u64 = undefined,
 
-    window_width: i32 = undefined,
-    window_height: i32 = undefined,
+    /// internal SDL variables
     window: ?*sdl.SDL_Window = null,
     renderer: ?*sdl.SDL_Renderer = null,
+
+    /// core variables
+    window_width: i32 = undefined,
+    window_height: i32 = undefined,
     is_running: bool = false,
-    total_ticks_passed: u64 = 0,
-    dt: u64 = 0,
 
     /// Initialize SDL3 and struct variables
     pub fn Init(title: [*:0]const u8, width: i32, height: i32) Renderer {
@@ -39,16 +53,16 @@ pub const Renderer = struct {
         result.window_width = width;
         result.window_height = height;
         result.is_running = true;
-        result.total_ticks_passed = sdl.SDL_GetTicks();
+
+        result.next_game_tick = sdl.SDL_GetTicks();
 
         return result;
     }
 
     /// Update tick-by-tick logic, this is where the tick-rate is limited
-    pub fn Update_State(this: *Renderer) void {
-        const current_tick = sdl.SDL_GetTicks();
-        this.dt = current_tick - this.total_ticks_passed;
-        this.total_ticks_passed = current_tick;
+    pub fn Update_Internal_Timers(this: *Renderer) void {
+        this.loop_count = 0;
+        this.current_time = sdl.SDL_GetTicks();
     }
 
     /// Process polled queued events
@@ -95,6 +109,11 @@ pub const Renderer = struct {
         // flush frame
         if (sdl.SDL_RenderPresent(this.renderer) == false)
             Log_Error_And_Quit("render frame failed!");
+    }
+
+    /// Cap framerate
+    pub fn Cap_Framerate() void {
+        sdl.SDL_Delay(frame_interval);
     }
 
     /// Deinits the struct then kills the program
